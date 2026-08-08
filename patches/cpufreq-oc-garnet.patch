@@ -1,21 +1,52 @@
 diff --git a/drivers/cpufreq/qcom-cpufreq-hw.c b/drivers/cpufreq/qcom-cpufreq-hw.c
+index 1111111..2222222 100644
 --- a/drivers/cpufreq/qcom-cpufreq-hw.c
 +++ b/drivers/cpufreq/qcom-cpufreq-hw.c
-@@ -		prev_freq = freq;
+@@ -1,3 +1,4 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+  */
+@@ -36,6 +37,10 @@
+ #define MAX_FN_SIZE			20
+ #define LIMITS_POLLING_DELAY_MS		4
  
- 		if (cpu_dev)
- 			dev_pm_opp_add(cpu_dev, freq * 1000, volt);
- 	}
- 
-+	/* Overclock little cluster ke 2016 MHz */
-+	if (cpumask_first(&c->related_cpus) < 4) {
-+		c->table[i].frequency = 2016000;
-+		c->table[i].driver_data = i - 1;
-+		if (cpu_dev)
-+			dev_pm_opp_add(cpu_dev, 2016000000, volt);
-+		i++;
-+	}
++/* OC target */
++#define GARNET_LITTLE_OC_FREQ		2265000U
++#define GARNET_BIG_OC_FREQ		3171000U
 +
- 	c->table[i].frequency = CPUFREQ_TABLE_END;
+ #define CYCLE_CNTR_OFFSET(core_id, m, acc_count)		\
+ 			(acc_count ? ((core_id + 1) * 4) : 0)
+@@ -288,7 +293,16 @@ static int
+ qcom_cpufreq_hw_read_lut(struct platform_device *pdev,
+ 			    struct cpufreq_qcom *c, u32 max_cores)
+ {
+-	struct device *dev = &pdev->dev, *cpu_dev;
++	struct device *dev = &pdev->dev, *cpu_dev;
++	bool little_cluster;
+ 	u32 data, src, lval, i, core_count, prev_cc, prev_freq, freq, volt;
+ 	unsigned long cpu;
  
- 	if (cpu_dev)
+@@ -299,6 +313,8 @@ qcom_cpufreq_hw_read_lut(struct platform_device *pdev,
+ 	cpu = cpumask_first(&c->related_cpus);
+ 	cpu_dev = get_cpu_device(cpu);
++	little_cluster = cpu < 4;
+ 
+ 	prev_cc = 0;
+ 
+@@ -320,6 +336,14 @@ static int qcom_cpufreq_hw_read_lut(struct platform_device *pdev,
+ 		if (src)
+ 			freq = xo_rate * lval / 1000;
+ 		else
+ 			freq = cpu_hw_rate / 1000;
++
++		/*
++		 * Override top boost entry so cpufreq exposes an OC frequency.
++		 * This only changes the frequency table visible to Linux.
++		 */
++		if (i == lut_max_entries - 2)
++			freq = little_cluster ? GARNET_LITTLE_OC_FREQ : GARNET_BIG_OC_FREQ;
+ 
+ 		c->table[i].frequency = freq;
+ 		dev_dbg(dev, "index=%d freq=%d, core_count %d\n",
+ 				i, c->table[i].frequency, core_count);
