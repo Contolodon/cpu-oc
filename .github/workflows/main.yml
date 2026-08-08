@@ -58,7 +58,7 @@ jobs:
             https://android.googlesource.com/platform/prebuilts/gas/linux-x86 \
             gas
 
-            - name: Clone AnyKernel3
+      - name: Clone AnyKernel3
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git ak3
           echo "AK3 files:"
