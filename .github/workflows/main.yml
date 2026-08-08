@@ -1,0 +1,188 @@
+name: Build Garnet CPU OC Module (Elysium)
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: 'Kernel version (jalankan: cat /proc/version)'
+        required: true
+        default: '5.10.251'
+      localversion:
+        description: 'LOCALVERSION string (dari cat /proc/version, contoh: -Elysium/inline-2.5)'
+        required: true
+        default: '-Elysium/inline-2.5'
+      apply_oc_patch:
+        description: 'Terapkan patch overclock 2016 MHz little core?'
+        required: true
+        type: boolean
+        default: false
+
+env:
+  ARCH: arm64
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Perluas ruang disk
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 512
+          swap-size-mb: 1024
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+
+      - name: Checkout repo ini
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex \
+            libncurses-dev libssl-dev libelf-dev zip unzip cpio \
+            python3 git wget
+
+      - name: Download Clang r416183b (sama persis dengan Elysium)
+        run: |
+          wget -qO clang.tar.gz \
+            "https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b/archive/refs/heads/lineage-20.0.tar.gz"
+          mkdir -p clang
+          tar xzf clang.tar.gz -C clang --strip-components=1
+          echo "Clang version:"
+          clang/bin/clang --version | head -1
+
+      - name: Download GNU Assembler
+        run: |
+          git clone --depth=1 \
+            https://android.googlesource.com/platform/prebuilts/gas/linux-x86 \
+            gas
+
+      - name: Download AnyKernel3
+        run: |
+          wget -q "https://github.com/osm0sis/AnyKernel3/releases/download/3.00/AnyKernel3-3.00.zip" -O ak3.zip
+          unzip -q ak3.zip -d ak3
+          echo "AK3 files:"
+          ls ak3/
+
+      - name: Clone marble kernel source (berisi driver vendor cpufreq)
+        run: |
+          git clone --depth=1 --branch melt-rebase \
+            https://github.com/Pzqqt/android_kernel_xiaomi_marble.git kernel
+          echo "Kernel source cloned. Driver location:"
+          ls kernel/drivers/cpufreq/qcom-cpufreq-hw.c 2>/dev/null && echo "FOUND" || echo "NOT FOUND"
+
+      - name: Set kernel version supaya cocok dengan Elysium
+        run: |
+          cd kernel
+          KV="${{ inputs.kernel_version }}"
+          MAJOR=$(echo $KV | cut -d. -f1)
+          MINOR=$(echo $KV | cut -d. -f2)
+          SUBLEVEL=$(echo $KV | cut -d. -f3)
+          sed -i "s/^VERSION = .*/VERSION = $MAJOR/" Makefile
+          sed -i "s/^PATCHLEVEL = .*/PATCHLEVEL = $MINOR/" Makefile
+          sed -i "s/^SUBLEVEL = .*/SUBLEVEL = $SUBLEVEL/" Makefile
+          echo "Makefile set to $KV:"
+          head -5 Makefile
+
+      - name: Cari defconfig marble
+        run: |
+          cd kernel
+          echo "=== Defconfigs tersedia ==="
+          find arch/arm64/configs/ -name "*defconfig" | head -20
+          DEFCONFIG=""
+          for name in marble_user_defconfig marble_defconfig vendor/marble-qgki_defconfig; do
+            if [ -f "arch/arm64/configs/$name" ]; then
+              DEFCONFIG="$name"
+              break
+            fi
+          done
+          if [ -z "$DEFCONFIG" ]; then
+            DEFCONFIG=$(find arch/arm64/configs/ -name "*marble*" -o -name "*melt*" 2>/dev/null | head -1)
+            DEFCONFIG=$(basename "$DEFCONFIG" 2>/dev/null)
+          fi
+          if [ -z "$DEFCONFIG" ]; then
+            echo "WARNING: Tidak ada defconfig marble, menggunakan defconfig pertama"
+            DEFCONFIG=$(find arch/arm64/configs/ -name "*defconfig" | head -1 | xargs basename)
+          fi
+          echo "DEFCONFIG=$DEFCONFIG" >> $GITHUB_ENV
+          echo "Using defconfig: $DEFCONFIG"
+
+      - name: Terapkan patch overclock
+        if: ${{ inputs.apply_oc_patch }}
+        run: |
+          cd kernel
+          for p in ${{ github.workspace }}/patches/*.patch; do
+            if [ -f "$p" ]; then
+              echo "Applying: $(basename $p)"
+              git apply "$p" 2>&1 || patch -p1 < "$p" 2>&1 || echo "WARNING: patch gagal"
+            fi
+          done
+
+      - name: Configure kernel
+        run: |
+          export PATH="$PWD/clang/bin:$PWD/gas:$PATH"
+          cd kernel
+          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- $DEFCONFIG
+          # Set localversion supaya vermagic cocok dengan Elysium
+          ./scripts/config --set-str CONFIG_LOCALVERSION "${{ inputs.localversion }}"
+          ./scripts/config --disable CONFIG_LOCALVERSION_AUTO
+          # Pastikan qcom-cpufreq-hw di-build sebagai module (=m)
+          if grep -q "CONFIG_QCOM_CPUFREQ_HW=y" .config; then
+            sed -i 's/CONFIG_QCOM_CPUFREQ_HW=y/CONFIG_QCOM_CPUFREQ_HW=m/' .config
+          elif grep -q "# CONFIG_QCOM_CPUFREQ_HW is not set" .config; then
+            sed -i 's/# CONFIG_QCOM_CPUFREQ_HW is not set/CONFIG_QCOM_CPUFREQ_HW=m/' .config
+          elif ! grep -q "CONFIG_QCOM_CPUFREQ_HW" .config; then
+            echo "CONFIG_QCOM_CPUFREQ_HW=m" >> .config
+          fi
+          # Disable module signing enforcement
+          ./scripts/config --disable CONFIG_MODULE_SIG_FORCE
+          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+          echo "=== QCOM_CPUFREQ_HW config ==="
+          grep CONFIG_QCOM_CPUFREQ_HW .config || echo "NOT SET!"
+          echo "=== LOCALVERSION ==="
+          grep CONFIG_LOCALVERSION .config
+
+      - name: Build cpufreq module
+        run: |
+          export PATH="$PWD/clang/bin:$PWD/gas:$PATH"
+          export KBUILD_BUILD_USER=builder
+          export KBUILD_BUILD_HOST=github
+          export KCFLAGS="-w"
+          cd kernel
+          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare
+          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- \
+            M=drivers/cpufreq modules 2>&1
+
+      - name: Cek vermagic module
+        run: |
+          echo "=== .ko files ==="
+          find kernel/drivers/cpufreq/ -name "*.ko" -type f
+          echo "=== Vermagic ==="
+          find kernel/drivers/cpufreq/ -name "qcom-cpufreq-hw.ko" -exec strings {} \; | grep vermagic
+          echo "=== Clang version ==="
+          find kernel/drivers/cpufreq/ -name "qcom-cpufreq-hw.ko" -exec strings {} \; | grep 'clang version'
+
+      - name: Package AnyKernel3 flashable zip
+        run: |
+          cp anykernel.sh ak3/anykernel.sh
+          mkdir -p ak3/_vendor_boot_modules
+          MODULE=$(find kernel/drivers/cpufreq/ -name "qcom-cpufreq-hw.ko" -type f | head -1)
+          if [ -z "$MODULE" ]; then
+            echo "ERROR: Module .ko tidak ditemukan! Build gagal."
+            exit 1
+          fi
+          cp "$MODULE" ak3/_vendor_boot_modules/qcom-cpufreq-hw.ko
+          echo "Module copied:"
+          ls -la ak3/_vendor_boot_modules/
+          cd ak3
+          zip -r ${{ github.workspace }}/Garnet_CPU_OC_Elysium.zip . -x "*.zip"
+          echo "=== Zip created ==="
+          ls -la ${{ github.workspace }}/Garnet_CPU_OC_Elysium.zip
+
+      - name: Upload flashable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: Garnet_CPU_OC_Elysium
+          path: Garnet_CPU_OC_Elysium.zip
+          retention-days: 30
