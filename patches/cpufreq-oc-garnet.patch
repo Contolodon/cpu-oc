@@ -1,1 +1,21 @@
-
+diff --git a/drivers/cpufreq/qcom-cpufreq-hw.c b/drivers/cpufreq/qcom-cpufreq-hw.c
+--- a/drivers/cpufreq/qcom-cpufreq-hw.c
++++ b/drivers/cpufreq/qcom-cpufreq-hw.c
+@@ -		prev_freq = freq;
+ 
+ 		if (cpu_dev)
+ 			dev_pm_opp_add(cpu_dev, freq * 1000, volt);
+ 	}
+ 
++	/* Overclock little cluster ke 2016 MHz */
++	if (cpumask_first(&c->related_cpus) < 4) {
++		c->table[i].frequency = 2016000;
++		c->table[i].driver_data = i - 1;
++		if (cpu_dev)
++			dev_pm_opp_add(cpu_dev, 2016000000, volt);
++		i++;
++	}
++
+ 	c->table[i].frequency = CPUFREQ_TABLE_END;
+ 
+ 	if (cpu_dev)
