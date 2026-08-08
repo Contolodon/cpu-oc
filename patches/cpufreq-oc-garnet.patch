@@ -7,31 +7,13 @@ diff --git a/drivers/cpufreq/qcom-cpufreq-hw.c b/drivers/cpufreq/qcom-cpufreq-hw
  			dev_pm_opp_add(cpu_dev, freq * 1000, volt);
  	}
  
-+	/* ============================================================ */
-+	/* OVERCLOCK BOTH CLUSTERS                                       */
-+	/* Little (cpu 0-3): 2016 MHz -> 2265 MHz                       */
-+	/* Big   (cpu 4-7): 2841 MHz -> 3171 MHz                        */
-+	/*                                                              */
-+	/* PERINGATAN: Ubah freq sesuai hardware LUT garnet. Jika       */
-+	/* freq tidak muncul di FKM, hardware tidak support -> turunkan */
-+	/* ============================================================ */
-+
++	/* Overclock little cluster ke 2016 MHz */
 +	if (cpumask_first(&c->related_cpus) < 4) {
-+		/* Little cluster OC ke 2265 MHz */
-+		c->table[i].frequency = 2265000;
++		c->table[i].frequency = 2016000;
 +		c->table[i].driver_data = i - 1;
 +		if (cpu_dev)
-+			dev_pm_opp_add(cpu_dev, 2265000000, volt);
++			dev_pm_opp_add(cpu_dev, 2016000000, volt);
 +		i++;
-+		pr_info("qcom-cpufreq-hw: OC little cluster -> 2265 MHz\n");
-+	} else {
-+		/* Big cluster OC ke 3171 MHz */
-+		c->table[i].frequency = 3171000;
-+		c->table[i].driver_data = i - 1;
-+		if (cpu_dev)
-+			dev_pm_opp_add(cpu_dev, 3171000000, volt);
-+		i++;
-+		pr_info("qcom-cpufreq-hw: OC big cluster -> 3171 MHz\n");
 +	}
 +
  	c->table[i].frequency = CPUFREQ_TABLE_END;
