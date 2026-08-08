@@ -12,7 +12,7 @@ on:
         required: true
         default: '-Elysium/inline-2.5'
       apply_oc_patch:
-        description: 'Terapkan patch overclock 2016 MHz little core?'
+        description: 'Terapkan patch overclock?'
         required: true
         type: boolean
         default: false
@@ -58,12 +58,13 @@ jobs:
             https://android.googlesource.com/platform/prebuilts/gas/linux-x86 \
             gas
 
-      - name: Download AnyKernel3
+            - name: Clone AnyKernel3
         run: |
-          wget -q "https://github.com/osm0sis/AnyKernel3/releases/download/3.00/AnyKernel3-3.00.zip" -O ak3.zip
-          unzip -q ak3.zip -d ak3
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git ak3
           echo "AK3 files:"
           ls ak3/
+          echo "=== tools/ ==="
+          ls ak3/tools/ | head -10
 
       - name: Clone marble kernel source (berisi driver vendor cpufreq)
         run: |
@@ -124,10 +125,8 @@ jobs:
           export PATH="$PWD/clang/bin:$PWD/gas:$PATH"
           cd kernel
           make ARCH=arm64 LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- $DEFCONFIG
-          # Set localversion supaya vermagic cocok dengan Elysium
           ./scripts/config --set-str CONFIG_LOCALVERSION "${{ inputs.localversion }}"
           ./scripts/config --disable CONFIG_LOCALVERSION_AUTO
-          # Pastikan qcom-cpufreq-hw di-build sebagai module (=m)
           if grep -q "CONFIG_QCOM_CPUFREQ_HW=y" .config; then
             sed -i 's/CONFIG_QCOM_CPUFREQ_HW=y/CONFIG_QCOM_CPUFREQ_HW=m/' .config
           elif grep -q "# CONFIG_QCOM_CPUFREQ_HW is not set" .config; then
@@ -135,7 +134,6 @@ jobs:
           elif ! grep -q "CONFIG_QCOM_CPUFREQ_HW" .config; then
             echo "CONFIG_QCOM_CPUFREQ_HW=m" >> .config
           fi
-          # Disable module signing enforcement
           ./scripts/config --disable CONFIG_MODULE_SIG_FORCE
           make ARCH=arm64 LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
           echo "=== QCOM_CPUFREQ_HW config ==="
@@ -176,7 +174,7 @@ jobs:
           echo "Module copied:"
           ls -la ak3/_vendor_boot_modules/
           cd ak3
-          zip -r ${{ github.workspace }}/Garnet_CPU_OC_Elysium.zip . -x "*.zip"
+          zip -r ${{ github.workspace }}/Garnet_CPU_OC_Elysium.zip . -x "*.zip" .git README.md
           echo "=== Zip created ==="
           ls -la ${{ github.workspace }}/Garnet_CPU_OC_Elysium.zip
 
