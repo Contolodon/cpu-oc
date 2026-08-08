@@ -120,8 +120,6 @@ jobs:
           echo "Applying OC patch..."
           git apply patches/cpufreq-oc-garnet.patch
 
-          echo "OC patch applied successfully."
-
       - name: Configure kernel
         run: |
           export PATH="$PWD/clang/bin:$PWD/gas:$PATH"
