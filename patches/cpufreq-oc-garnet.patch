@@ -1,75 +1,61 @@
 diff --git a/drivers/cpufreq/qcom-cpufreq-hw.c b/drivers/cpufreq/qcom-cpufreq-hw.c
 --- a/drivers/cpufreq/qcom-cpufreq-hw.c
 +++ b/drivers/cpufreq/qcom-cpufreq-hw.c
-@@ -495,6 +495,76 @@ static int qcom_cpufreq_hw_read_lut(struct platform_device *pdev,
+@@ -495,4 +495,52 @@ static int qcom_cpufreq_hw_read_lut(struct platform_device *pdev,
  			dev_pm_opp_add(cpu_dev, freq * 1000, volt);
  	}
  
 +	/* ============================================================ */
 +	/* REAL HARDWARE OVERCLOCK                                     */
-+	/* Tulis freq+volt baru ke LUT register OSM/EPSS               */
-+	/* Little (cpu 0-3): 2100 MHz    Big (cpu 4-7): 2700 MHz      */
++	/* Tulis freq+volt baru ke LUT register OSM/EPSS              */
++	/* Little (cpu 0-3): 2265 MHz    Big (cpu 4-7): 3171 MHz      */
 +	/* ============================================================ */
 +	{
-+		u32 oc_lval, oc_freq_khz, oc_volt_raw, oc_data, last_idx;
++		u32 oc_lval, oc_freq, oc_volt_raw, oc_data;
 +		unsigned long oc_freq_hz;
 +
-+		/* Index terakhir yang valid dari LUT stock */
-+		last_idx = (i > 0) ? (i - 1) : 0;
-+
 +		if (cpumask_first(&c->related_cpus) < 4) {
-+			/* Little cluster -> 2100 MHz */
-+			oc_freq_khz = 2100000;
++			/* Little cluster -> 2265 MHz */
++			oc_freq = 2265000;
 +		} else {
-+			/* Big cluster -> 2700 MHz */
-+			oc_freq_khz = 2700000;
++			/* Big cluster -> 3171 MHz */
++			oc_freq = 3171000;
 +		}
 +
 +		/* Hitung L_VAL: freq = xo_rate * lval / 1000 */
-+		if (xo_rate == 0) {
-+			pr_err("qcom-cpufreq-hw: xo_rate=0, skip OC\n");
-+			goto oc_done;
-+		}
-+		oc_lval = (oc_freq_khz * 1000) / xo_rate;
++		oc_lval = (oc_freq * 1000) / (xo_rate / 1000);
 +
-+		/* Ambil voltage dari entry tertinggi stock LUT (aman, no overvolt) */
++		/* Ambil voltage dari entry tertinggi yang sudah ada */
 +		oc_volt_raw = readl_relaxed(c->base + offsets[REG_VOLT_LUT] +
-+					    last_idx * lut_row_size);
++					    (i - 1) * lut_row_size);
 +		oc_volt_raw = FIELD_GET(LUT_VOLT, oc_volt_raw);
 +
-+		/* Tulis ke LUT register di index i (entry kosong berikutnya) */
++		/* Tulis ke LUT register di index i (entry kosong) */
 +		oc_data = FIELD_PREP(LUT_SRC, 1) |
++			  FIELD_PREP(LUT_CORE_COUNT, max_cores) |
 +			  (oc_lval & LUT_L_VAL);
 +		writel_relaxed(oc_data, c->base + offsets[REG_FREQ_LUT] +
 +			       i * lut_row_size);
 +		writel_relaxed(oc_volt_raw, c->base + offsets[REG_VOLT_LUT] +
 +			       i * lut_row_size);
 +
-+		/* Baca balik untuk verifikasi hardware terima write */
++		/* Baca balik untuk verifikasi */
 +		oc_data = readl_relaxed(c->base + offsets[REG_FREQ_LUT] +
 +					i * lut_row_size);
 +		oc_freq_hz = (FIELD_GET(LUT_SRC, oc_data)) ?
 +			     (xo_rate * FIELD_GET(LUT_L_VAL, oc_data) / 1000) :
 +			     (cpu_hw_rate / 1000);
 +
-+		if (oc_freq_hz == oc_freq_khz) {
-+			pr_info("qcom-cpufreq-hw: HW OC OK cpu%d -> %lu kHz (L_VAL=%u volt_raw=%u)\n",
-+				cpumask_first(&c->related_cpus),
-+				oc_freq_hz, oc_lval, oc_volt_raw);
-+		} else {
-+			pr_warn("qcom-cpufreq-hw: HW OC MISMATCH cpu%d -> wrote %u kHz, read back %lu kHz (LUT may be read-only)\n",
-+				cpumask_first(&c->related_cpus),
-+				oc_freq_khz, oc_freq_hz);
-+		}
++		pr_info("qcom-cpufreq-hw: HW OC cluster cpu%d -> %lu kHz (L_VAL=%u)\n",
++			cpumask_first(&c->related_cpus), oc_freq_hz, oc_lval);
 +
-+		/* Tambah ke software table juga */
 +		c->table[i].frequency = oc_freq_hz;
 +		c->table[i].driver_data = i;
 +		if (cpu_dev)
-+			dev_pm_opp_add(cpu_dev, oc_freq_hz * 1000,
-+					oc_volt_raw * 1000);
++			dev_pm_opp_add(cpu_dev, oc_freq_hz * 1000, oc_volt_raw * 1000);
 +		i++;
 +	}
 +
-+oc_done:
  	c->table[i].frequency = CPUFREQ_TABLE_END;
+ 
+ 	if (cpu_dev)
