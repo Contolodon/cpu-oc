@@ -73,4 +73,4 @@ diff --git a/drivers/cpufreq/qcom-cpufreq-hw.c b/drivers/cpufreq/qcom-cpufreq-hw
 +
 +oc_done:
  	c->table[i].frequency = CPUFREQ_TABLE_END;
-   if (cpu_dev)
+    if (cpu_dev)
