@@ -1,29 +1,34 @@
 diff --git a/drivers/cpufreq/qcom-cpufreq-hw.c b/drivers/cpufreq/qcom-cpufreq-hw.c
 --- a/drivers/cpufreq/qcom-cpufreq-hw.c
 +++ b/drivers/cpufreq/qcom-cpufreq-hw.c
-@@ -36,6 +36,10 @@
- #define MAX_FN_SIZE			20
- #define LIMITS_POLLING_DELAY_MS		4
-
-+#define GARNET_LITTLE_OC_FREQ		2265000U
-+#define GARNET_BIG_OC_FREQ		3171000U
+@@ -495,4 +495,28 @@ static int qcom_cpufreq_hw_read_lut(struct platform_device *pdev,
+ 			dev_pm_opp_add(cpu_dev, freq * 1000, volt);
+ 	}
+ 
++	/* ============================================================ */
++	/* OVERCLOCK: Tambah entry frekuensi di atas stock LUT           */
++	/* Little cluster (cpu 0-3): 2265 MHz                           */
++	/* Big cluster   (cpu 4-7): 3171 MHz                             */
++	/* Ubah freq (dalam kHz) sesuai kebutuhan.                       */
++	/* ============================================================ */
++	if (cpumask_first(&c->related_cpus) < 4) {
++		/* Little cluster OC */
++		c->table[i].frequency = 2265000;
++		c->table[i].driver_data = i;
++		if (cpu_dev)
++			dev_pm_opp_add(cpu_dev, 2265000000, volt);
++		i++;
++		pr_info("qcom-cpufreq-hw: OC little cluster -> 2265 MHz\n");
++	} else {
++		/* Big cluster OC */
++		c->table[i].frequency = 3171000;
++		c->table[i].driver_data = i;
++		if (cpu_dev)
++			dev_pm_opp_add(cpu_dev, 3171000000, volt);
++		i++;
++		pr_info("qcom-cpufreq-hw: OC big cluster -> 3171 MHz\n");
++	}
 +
- #define CYCLE_CNTR_OFFSET(core_id, m, acc_count)		\
- 			(acc_count ? ((core_id + 1) * 4) : 0)
-
-@@ -320,10 +324,16 @@ static int qcom_cpufreq_hw_read_lut(struct platform_device *pdev,
- 		if (src)
- 			freq = xo_rate * lval / 1000;
- 		else
- 			freq = cpu_hw_rate / 1000;
-+
-+		if (i == lut_max_entries - 2) {
-+			if (cpumask_first(&c->related_cpus) < 4)
-+				freq = GARNET_LITTLE_OC_FREQ;
-+			else
-+				freq = GARNET_BIG_OC_FREQ;
-+		}
-
- 		c->table[i].frequency = freq;
- 		dev_dbg(dev, "index=%d freq=%d, core_count %d\n",
- 				i, c->table[i].frequency, core_count);
+ 	c->table[i].frequency = CPUFREQ_TABLE_END;
+ 
+ 	if (cpu_dev)
