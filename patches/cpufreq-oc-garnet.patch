@@ -1,11 +1,10 @@
 diff --git a/drivers/cpufreq/qcom-cpufreq-hw.c b/drivers/cpufreq/qcom-cpufreq-hw.c
 --- a/drivers/cpufreq/qcom-cpufreq-hw.c
 +++ b/drivers/cpufreq/qcom-cpufreq-hw.c
-@@ -495,6 +495,74 @@
+@@ -495,5 +495,73 @@
  		if (cpu_dev)
  			dev_pm_opp_add(cpu_dev, freq * 1000, volt);
  	}
- 
 +	/* ============================================================ */
 +	/* REAL HARDWARE OVERCLOCK */
 +	/* Tulis freq+volt baru ke LUT register OSM/EPSS */
@@ -73,6 +72,5 @@ diff --git a/drivers/cpufreq/qcom-cpufreq-hw.c b/drivers/cpufreq/qcom-cpufreq-hw
 +	}
 +
 +oc_done:
- 
  	c->table[i].frequency = CPUFREQ_TABLE_END;
- 	if (cpu_dev)
+  if (cpu_dev)
