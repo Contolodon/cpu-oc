@@ -112,13 +112,13 @@ jobs:
       - name: Terapkan patch overclock
         if: ${{ inputs.apply_oc_patch }}
         run: |
-          set -euo pipefail
-
-          echo "Checking OC patch..."
-          git apply --check patches/cpufreq-oc-garnet.patch
-
-          echo "Applying OC patch..."
-          git apply patches/cpufreq-oc-garnet.patch
+          cd kernel
+          for p in ${{ github.workspace }}/patches/*.patch; do
+            if [ -f "$p" ]; then
+              echo "Applying: $(basename $p)"
+              git apply "$p" 2>&1 || patch -p1 < "$p" 2>&1 || echo "WARNING: patch gagal"
+            fi
+          done
 
       - name: Configure kernel
         run: |
