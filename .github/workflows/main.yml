@@ -68,7 +68,7 @@ jobs:
 
       - name: Clone marble kernel source (berisi driver vendor cpufreq)
         run: |
-          git clone --depth=1 --branch melt-rebase \
+          git clone --depth=1 --branch garnet-t-oss \
             https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git kernel
           echo "Kernel source cloned. Driver location:"
           ls kernel/drivers/cpufreq/qcom-cpufreq-hw.c 2>/dev/null && echo "FOUND" || echo "NOT FOUND"
