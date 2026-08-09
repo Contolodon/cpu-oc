@@ -1,7 +1,7 @@
 diff --git a/drivers/cpufreq/qcom-cpufreq-hw.c b/drivers/cpufreq/qcom-cpufreq-hw.c
 --- a/drivers/cpufreq/qcom-cpufreq-hw.c
 +++ b/drivers/cpufreq/qcom-cpufreq-hw.c
-@@ -495,5 +495,73 @@
+@@ -495,3 +495,71 @@
  		if (cpu_dev)
  			dev_pm_opp_add(cpu_dev, freq * 1000, volt);
  	}
@@ -72,5 +72,3 @@ diff --git a/drivers/cpufreq/qcom-cpufreq-hw.c b/drivers/cpufreq/qcom-cpufreq-hw
 +	}
 +
 +oc_done:
- 	c->table[i].frequency = CPUFREQ_TABLE_END;
-    if (cpu_dev)
