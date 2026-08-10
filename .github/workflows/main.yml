@@ -114,12 +114,26 @@ jobs:
         if: ${{ inputs.apply_oc_patch }}
         run: |
           cd kernel
-          for p in ${{ github.workspace }}/patches/*.patch; do
-            if [ -f "$p" ]; then
-              echo "Applying: $(basename $p)"
-              git apply "$p" 2>&1 || patch -p1 < "$p" 2>&1 || echo "WARNING: patch gagal"
-            fi
-          done
+          SRC=drivers/cpufreq/qcom-cpufreq-hw.c
+          OC=${{ github.workspace }}/patches/oc_code.c
+          if [ ! -f "$OC" ]; then
+            echo "ERROR: patches/oc_code.c not found!"
+            exit 1
+          fi
+          LINE=$(grep -nF "c->table[i].frequency = CPUFREQ_TABLE_END;" "$SRC" | head -1 | cut -d: -f1)
+          if [ -z "$LINE" ]; then
+            echo "ERROR: marker 'CPUFREQ_TABLE_END' not found in source!"
+            exit 1
+          fi
+          echo "Inserting OC code before line $LINE"
+          head -n $((LINE - 1)) "$SRC" > /tmp/qcom_tmp.c
+          cat "$OC" >> /tmp/qcom_tmp.c
+          tail -n +$LINE "$SRC" >> /tmp/qcom_tmp.c
+          mv /tmp/qcom_tmp.c "$SRC"
+          echo "=== OC code inserted. Verifying... ==="
+          grep -n "HW OC" "$SRC" | head -5
+          echo "=== Context around insertion ==="
+          sed -n "$((LINE-3)),$((LINE+5))p" "$SRC"
 
       - name: Configure kernel
         run: |
