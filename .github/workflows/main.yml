@@ -58,7 +58,7 @@ jobs:
             https://android.googlesource.com/platform/prebuilts/gas/linux-x86 \
             gas
 
-     - name: Download AnyKernel3
+      - name: Download AnyKernel3
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git ak3
           rm -rf ak3/.git
@@ -70,7 +70,7 @@ jobs:
       - name: Clone marble kernel source (berisi driver vendor cpufreq)
         run: |
           git clone --depth=1 --branch melt-rebase \
-            https://github.com/Pzqqt/android_kernel_xiaomi_marble.git kernel
+           https://github.com/Pzqqt/android_kernel_xiaomi_marble.git kernel
           echo "Kernel source cloned. Driver location:"
           ls kernel/drivers/cpufreq/qcom-cpufreq-hw.c 2>/dev/null && echo "FOUND" || echo "NOT FOUND"
 
