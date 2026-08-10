@@ -9,7 +9,7 @@ diff --git a/drivers/cpufreq/qcom-cpufreq-hw.c b/drivers/cpufreq/qcom-cpufreq-hw
 +	/* REAL HARDWARE OVERCLOCK                                     */
 +	/* Modify existing max LUT entry (safer than adding new slot)  */
 +	/* Little (cpu 0-3): 2100 MHz    Big (cpu 4-7): 2700 MHz      */
-+	/* Uses existing LUT slot + stock voltage = no overvolt risk   */
++	/* Uses existing LUT slot + stock voltage = no overvolt risk  */
 +	/* ============================================================ */
 +	{
 +		u32 oc_lval, oc_freq_khz, oc_data, last_idx;
